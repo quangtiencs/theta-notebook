@@ -1,0 +1,244 @@
+---
+title: "Independent Component Analysis"
+author: "quangtiencs"
+date: "March 26, 2019"
+output: html_document
+---
+
+Bài viết được đăng ở
+https://thetalog.com/statistics/independent-component-analysis/
+
+Nguồn ẩn sâu bên dưới:
+
+```{r}
+library(ggplot2)
+library(gridExtra)
+
+source.data <- read.csv(file.path("..", "data", "S-true.csv"), header = F)
+s1.graph <- ggplot(source.data, aes(x=1:400, y = V1)) + geom_line()
+s2.graph <- ggplot(source.data, aes(x=1:400, y = V2)) + geom_line()
+s3.graph <- ggplot(source.data, aes(x=1:400, y = V3)) + geom_line()
+
+grid.arrange(s1.graph,s2.graph, s3.graph)
+```
+
+Dữ liệu thu thập được:
+
+```{r}
+samples.data <- read.csv(file.path("..", "data", "X.csv"), header = F)
+x1.graph <- ggplot(samples.data, aes(x=1:400, y = V1)) + geom_line()
+x2.graph <- ggplot(samples.data, aes(x=1:400, y = V2)) + geom_line()
+x3.graph <- ggplot(samples.data, aes(x=1:400, y = V3)) + geom_line()
+
+grid.arrange(x1.graph,x2.graph, x3.graph)
+```
+
+
+```{r}
+set.seed(0)
+```
+
+Bạn đọc tải dữ liệu về, đọc dữ liệu lên bằng hàm:
+
+```{r}
+X <- as.matrix(read.csv(file.path("..", "data", "X.csv"), header = F))
+```
+
+```{r}
+#' Chỉnh tâm dữ liệu
+#'
+#' @param X: matrix - n dòng với p cột
+#'
+#' @return X.new: matrix - X sau khi được chỉnh tâm trừ cho trung bình
+#' 
+centerData <- function(X){
+  X.mean <- colMeans(X)
+  X.new <- X - X.mean
+  return(X.new)
+}
+
+#' Tẩy dữ liệu
+#'
+#' @param X: matrix - n dòng với p cột
+#'
+#' @return X.whiten: matrix - dữ liệu sau khi được whitening transformation
+#' 
+whitenData <- function(X){
+  V <- t(X) %*% X / nrow(X)
+  s <- La.svd(V)
+  D <- diag(c(1/sqrt(s$d)))
+  K <- D %*% t(s$u)
+  
+  X.whiten <- t(K %*% t(X))
+  return(X.whiten)
+}
+```
+
+```{r}
+X <- centerData(X)
+X <- whitenData(X)
+```
+
+```{r}
+#'
+#' Hàm logcosh
+#'
+#' G(y) = 1/alpha * log(cosh(alpha y))
+#' g(y) = tanh(alpha * y)
+#' g'(y) = alpha ( 1 - tanh^2(alpha * y))
+#' 
+#' @param y: matrix - 1 dòng với n cột
+#' @return result: list - g() & g'()
+#' 
+logcosh.func <- function(y, alpha=1){
+  y <- alpha * y
+  gy <- tanh(y)
+  g2y = alpha * (1 - gy*gy)
+  g2y <- rowMeans(g2y)
+  
+  result <- list(gy=gy, g2y=g2y)
+  return(result)
+}
+
+#'
+#' Hàm logcosh
+#'
+#' G(y) = -exp[(-y^2) / 2] 
+#' g(y) = y exp[(-y^2) / 2] 
+#' g'(y) = (1-y^2) exp[(-y^2) / 2] 
+#' 
+#' @param y: matrix - 1 dòng với n cột
+#' @return result: list - g() & g'()
+#' 
+exp.func <- function(y){
+  exp.value <- exp(-(y ^ 2) / 2)
+  gy <- y * exp.value
+  g2y <- (1 - y ^ 2) * exp.value
+  g2y <- rowMeans(g2y)
+  
+  result <- list(gy=gy, g2y=g2y)
+  return(result)
+}
+```
+
+```{r}
+#'
+#'FastICA cho một thành phần độc lập
+#'(tính toán vectorize)
+#'
+#' @param X: matrix - n dòng với p cột
+#' @param g.func: function - hàm trả về g & g'
+#' @param tolerance: float - dung sai cho phép
+#' @param max.iter: số vòng lặp tối đa
+#'
+#' @return w: matrix - shape (1, p)
+#' 
+fastICA.one.unit <- function(X, g.func=logcosh.func, tolerance=1e-5, max.iter=1000){
+  m <- nrow(X)
+  p <- ncol(X)
+  
+  w <- t(rnorm(p))
+  
+  for (i in 1:max.iter){
+    wtx <- w %*% t(X)
+    g.res <- g.func(wtx)
+    gy <- g.res$gy
+    g2y <- g.res$g2y
+    
+    w.new <- gy %*% X /m - g2y*w
+    w.new <- w.new / sqrt(sum(w.new^2))
+    
+    epsilon <- w.new %*% t(w)
+    
+    w <- w.new
+    
+    if (epsilon < tolerance) {
+      break
+    }
+  }
+  return(w)
+}
+```
+
+
+```{r}
+set.seed(12)
+w <- fastICA.one.unit(X)
+estimate.s <- t(w %*% t(X))
+ggplot(as.data.frame(estimate.s),aes(x=1:400,y = V1)) + geom_line()
+```
+```{r}
+set.seed(52)
+w <- fastICA.one.unit(X)
+estimate.s <- t(w %*% t(X))
+ggplot(as.data.frame(estimate.s),aes(x=1:400,y = V1)) + geom_line()
+```
+```{r}
+set.seed(28)
+w <- fastICA.one.unit(X)
+estimate.s <- t(w %*% t(X))
+ggplot(as.data.frame(estimate.s),aes(x=1:400,y = V1)) + geom_line()
+```
+```{r}
+#' Trực giao hóa đối xứng (xóa tương quan)
+#' 
+#' @param W: matrix - p dòng với p cột
+#' @return W: matrix - p dòng với p cột
+#'
+symetric.Orthogonal <- function(W){
+  sW <- La.svd(W)
+  W <- sW$u %*% diag(1/sW$d) %*% t(sW$u) %*% W
+  return(W)
+}
+
+#'
+#'  FastICA cho nhiều thành phần
+#'  Parallel FastICA - dùng trực giao đối xứng
+#'  
+#'  @param X: np.array - n dòng với p cột
+#'  @param g_func: function - hàm trả về g & g'
+#'  @param tolerance: float - dung sai cho phép
+#'  @param max_iter: số vòng lặp tối đa
+#'  
+#'  @return W: np.array - shape (p, p) với mỗi hàng là w_i
+fastICA.symetric <- function(X, g.func=logcosh.func, tolerance=1e-5, max.iter=1000){
+  m <- nrow(X)
+  p <- ncol(X)
+  
+  W <- matrix(rnorm(p*p), nrow=p)
+  W <- symetric.Orthogonal(W)
+  
+  for (i in 1:max.iter){
+    wtx <- W %*% t(X)
+    g.res <- g.func(wtx)
+    gy <- g.res$gy
+    g2y <- g.res$g2y
+    
+    W.new <- gy %*% X /m - g2y*W
+    W.new <- symetric.Orthogonal(W.new)
+    
+    epsilon <- max(Mod(Mod(diag(W.new %*% t(W))) - 1))
+    
+    W <- W.new
+    
+    if (epsilon < tolerance){
+      break
+    }
+  }
+  return(W)
+}
+```
+
+```{r}
+ W <- fastICA.symetric(X)
+data <- as.data.frame(t(W %*% t(X)))
+
+g1 <- ggplot(as.data.frame(data),aes(x=1:400,y = V1)) + geom_line()
+g2 <- ggplot(as.data.frame(data),aes(x=1:400,y = V2)) + geom_line()
+g3 <- ggplot(as.data.frame(data),aes(x=1:400,y = V3)) + geom_line()
+
+grid.arrange(g1,g2, g3)
+
+```
+
+
