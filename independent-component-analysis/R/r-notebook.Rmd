@@ -86,36 +86,34 @@ X <- whitenData(X)
 #' G(y) = 1/alpha * log(cosh(alpha y))
 #' g(y) = tanh(alpha * y)
 #' g'(y) = alpha ( 1 - tanh^2(alpha * y))
-#' 
+#'
 #' @param y: matrix - 1 dòng với n cột
 #' @return result: list - g() & g'()
-#' 
+#'
 logcosh.func <- function(y, alpha=1){
   y <- alpha * y
   gy <- tanh(y)
   g2y = alpha * (1 - gy*gy)
-  g2y <- rowMeans(g2y)
-  
+
   result <- list(gy=gy, g2y=g2y)
   return(result)
 }
 
 #'
-#' Hàm logcosh
+#' Hàm exp (không đặt hàm exp vì trùng tên với R)
 #'
-#' G(y) = -exp[(-y^2) / 2] 
-#' g(y) = y exp[(-y^2) / 2] 
-#' g'(y) = (1-y^2) exp[(-y^2) / 2] 
-#' 
+#' G(y) = -exp[(-y^2) / 2]
+#' g(y) = y exp[(-y^2) / 2]
+#' g'(y) = (1-y^2) exp[(-y^2) / 2]
+#'
 #' @param y: matrix - 1 dòng với n cột
 #' @return result: list - g() & g'()
-#' 
+#'
 exp.func <- function(y){
   exp.value <- exp(-(y ^ 2) / 2)
   gy <- y * exp.value
   g2y <- (1 - y ^ 2) * exp.value
-  g2y <- rowMeans(g2y)
-  
+
   result <- list(gy=gy, g2y=g2y)
   return(result)
 }
@@ -132,26 +130,26 @@ exp.func <- function(y){
 #' @param max.iter: số vòng lặp tối đa
 #'
 #' @return w: matrix - shape (1, p)
-#' 
+#'
 fastICA.one.unit <- function(X, g.func=logcosh.func, tolerance=1e-5, max.iter=1000){
   m <- nrow(X)
   p <- ncol(X)
-  
+
   w <- t(rnorm(p))
-  
+
   for (i in 1:max.iter){
     wtx <- w %*% t(X)
     g.res <- g.func(wtx)
     gy <- g.res$gy
     g2y <- g.res$g2y
-    
-    w.new <- gy %*% X /m - g2y*w
+
+    w.new <- gy %*% X /m - rowMeans(g2y)*w
     w.new <- w.new / sqrt(sum(w.new^2))
-    
+
     epsilon <- w.new %*% t(w)
-    
+
     w <- w.new
-    
+
     if (epsilon < tolerance) {
       break
     }
@@ -181,7 +179,7 @@ ggplot(as.data.frame(estimate.s),aes(x=1:400,y = V1)) + geom_line()
 ```
 ```{r}
 #' Trực giao hóa đối xứng (xóa tương quan)
-#' 
+#'
 #' @param W: matrix - p dòng với p cột
 #' @return W: matrix - p dòng với p cột
 #'
@@ -194,33 +192,33 @@ symetric.Orthogonal <- function(W){
 #'
 #'  FastICA cho nhiều thành phần
 #'  Parallel FastICA - dùng trực giao đối xứng
-#'  
+#'
 #'  @param X: np.array - n dòng với p cột
 #'  @param g_func: function - hàm trả về g & g'
 #'  @param tolerance: float - dung sai cho phép
 #'  @param max_iter: số vòng lặp tối đa
-#'  
+#'
 #'  @return W: np.array - shape (p, p) với mỗi hàng là w_i
 fastICA.symetric <- function(X, g.func=logcosh.func, tolerance=1e-5, max.iter=1000){
   m <- nrow(X)
   p <- ncol(X)
-  
+
   W <- matrix(rnorm(p*p), nrow=p)
   W <- symetric.Orthogonal(W)
-  
+
   for (i in 1:max.iter){
     wtx <- W %*% t(X)
     g.res <- g.func(wtx)
     gy <- g.res$gy
     g2y <- g.res$g2y
-    
-    W.new <- gy %*% X /m - g2y*W
+
+    W.new <- gy %*% X /m - rowMeans(g2y)*W
     W.new <- symetric.Orthogonal(W.new)
-    
+
     epsilon <- max(Mod(Mod(diag(W.new %*% t(W))) - 1))
-    
+
     W <- W.new
-    
+
     if (epsilon < tolerance){
       break
     }
@@ -230,7 +228,7 @@ fastICA.symetric <- function(X, g.func=logcosh.func, tolerance=1e-5, max.iter=10
 ```
 
 ```{r}
- W <- fastICA.symetric(X)
+W <- fastICA.symetric(X)
 data <- as.data.frame(t(W %*% t(X)))
 
 g1 <- ggplot(as.data.frame(data),aes(x=1:400,y = V1)) + geom_line()
