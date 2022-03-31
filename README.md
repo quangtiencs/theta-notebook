@@ -5,5 +5,6 @@
 
 
 * Author: quangtiencs@gmail.com
+* Personal Website: https://quangtiencs.com/
 * Website: https://thetalog.com/
 * ThetaLog Facebook: https://www.facebook.com/ThetaLog
